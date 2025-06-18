@@ -61,7 +61,7 @@ loss_fn = nn.BCELoss()
 g_optimizer = optim.Adam(generator.parameters(), lr=0.001)
 d_optimizer = optim.Adam(discriminator.parameters(), lr=0.001)
 
-epochs = 60
+epochs = 120
 g_losses = []
 d_losses = []
 for epoch in range(epochs):
@@ -73,18 +73,20 @@ for epoch in range(epochs):
         fake_labels = torch.zeros((batch_size, 1), device=device)
 
         # Training discriminator
-        outputs = discriminator(real_batch, bits_batch)
-        d_loss_real = loss_fn(outputs, real_labels)
+        g_loss = 0
+        for _ in range(2):
+            outputs = discriminator(real_batch, bits_batch)
+            d_loss_real = loss_fn(outputs, real_labels)
 
-        z = torch.randn(batch_size, latent_dim, device=device)
-        fake_data = generator(z, bits_batch)
-        outputs = discriminator(fake_data.detach(), bits_batch)
-        d_loss_fake = loss_fn(outputs, fake_labels)
+            z = torch.randn(batch_size, latent_dim, device=device)
+            fake_data = generator(z, bits_batch)
+            outputs = discriminator(fake_data.detach(), bits_batch)
+            d_loss_fake = loss_fn(outputs, fake_labels)
 
-        d_loss = d_loss_real + d_loss_fake
-        d_optimizer.zero_grad()
-        d_loss.backward()
-        d_optimizer.step()
+            d_loss = d_loss_real + d_loss_fake
+            d_optimizer.zero_grad()
+            d_loss.backward()
+            d_optimizer.step()
 
         # Training generator
         z = torch.randn(batch_size, latent_dim, device=device)
