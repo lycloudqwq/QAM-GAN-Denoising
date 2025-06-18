@@ -12,11 +12,11 @@ class Generator(nn.Module):
     def __init__(self, latent_dim, cond_dim=16, out_dim=2):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(latent_dim + cond_dim, 64),
-            nn.ReLU(),
-            nn.Linear(64, 64),
-            nn.ReLU(),
-            nn.Linear(64, out_dim)
+            nn.Linear(latent_dim + cond_dim, 128),
+            nn.LeakyReLU(),
+            nn.Linear(128, 128),
+            nn.LeakyReLU(),
+            nn.Linear(128, out_dim)
         )
 
     def forward(self, z, bits):
@@ -28,11 +28,11 @@ class Discriminator(nn.Module):
     def __init__(self, cond_dim=16, in_dim=2):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(in_dim + cond_dim, 64),
-            nn.ReLU(),
-            nn.Linear(64, 64),
-            nn.ReLU(),
-            nn.Linear(64, 1),
+            nn.Linear(in_dim + cond_dim, 128),
+            nn.LeakyReLU(),
+            nn.Linear(128, 128),
+            nn.LeakyReLU(),
+            nn.Linear(128, 1),
             nn.Sigmoid()
         )
 
