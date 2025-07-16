@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+import ot
 from torch.utils.data import DataLoader, TensorDataset
 
 from load_data import load_data
@@ -12,11 +13,13 @@ class Generator(nn.Module):
     def __init__(self, latent_dim, cond_dim=16, out_dim=2):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(latent_dim + cond_dim, 128),
-            nn.LeakyReLU(),
-            nn.Linear(128, 128),
-            nn.LeakyReLU(),
-            nn.Linear(128, out_dim)
+            nn.Linear(latent_dim + cond_dim, 64),
+            nn.BatchNorm1d(64),
+            nn.LeakyReLU(0.2),
+            nn.Linear(64, 64),
+            nn.BatchNorm1d(64),
+            nn.LeakyReLU(0.2),
+            nn.Linear(64, out_dim)
         )
 
     def forward(self, z, bits):
@@ -28,11 +31,13 @@ class Discriminator(nn.Module):
     def __init__(self, cond_dim=16, in_dim=2):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(in_dim + cond_dim, 128),
-            nn.LeakyReLU(),
-            nn.Linear(128, 128),
-            nn.LeakyReLU(),
-            nn.Linear(128, 1),
+            nn.Linear(in_dim + cond_dim, 64),
+            nn.LeakyReLU(0.2),
+            nn.Dropout(0.2), 
+            nn.Linear(64, 64),
+            nn.LeakyReLU(0.2),
+            nn.Dropout(0.2), 
+            nn.Linear(64, 1),
             nn.Sigmoid()
         )
 
@@ -113,7 +118,37 @@ def generate_gan_samples(generator, num_samples=1000, latent_dim=10, cond_dim=16
     return gen_points, bits_idx
 
 
+def calc_wasserstein_distance(real_samples, gen_samples):
+    n = real_samples.shape[0]
+    m = gen_samples.shape[0]
+    a = np.ones((n,)) / n
+    b = np.ones((m,)) / m
+    M = ot.dist(real_samples, gen_samples, metric='euclidean')
+    emd_value = ot.emd2(a, b, M)
+    return emd_value
+
+
 if __name__ == "__main__":
     gan_points, gan_bits = generate_gan_samples(generator, num_samples=10000, latent_dim=10, cond_dim=16, device=device)
     plot_gan_losses(g_losses, d_losses)
     gan_generate_constellation(gan_points, gan_bits)
+
+    # 真实数据
+    real_points = data.cpu().numpy()
+    real_bits = bits_int
+
+    # 分bits评估Wasserstein距离
+    wasserstein_per_bit = []
+    for i in range(16):
+        real_group = real_points[real_bits == i]
+        gan_group = gan_points[gan_bits == i]
+        min_len = min(len(real_group), len(gan_group))
+        if min_len == 0:
+            wasserstein_per_bit.append(np.nan)
+            continue
+        real_sub = real_group[:min_len]
+        gan_sub = gan_group[:min_len]
+        dist = calc_wasserstein_distance(real_sub, gan_sub)
+        wasserstein_per_bit.append(dist)
+        print(f"Bit {i:04b}: Wasserstein = {dist:.4f}")
+    print(f"Average Wasserstein Distance (per bit): {np.nanmean(wasserstein_per_bit):.4f}")
